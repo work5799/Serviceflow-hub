@@ -12,8 +12,11 @@ import {
   type AppDataSection,
   createEmptyFirebaseConfig,
   disconnectFirebaseClient,
+  getFirebaseConnectionErrorMessage,
   hasFirebaseCredentials,
   initializeFirebaseClient,
+  isFirestoreOfflineError,
+  probeFirestoreAvailability,
   saveFirestoreSection,
   seedFirestoreCollections,
   subscribeToFirestore,
@@ -185,27 +188,44 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       unsubscribeRef.current?.();
 
-      const { db } = await initializeFirebaseClient(nextConfig);
-      const seededData = await seedFirestoreCollections(db, appData);
-      const normalizedSeededData = normalizeAppData(seededData);
+      const firestoreProbeMessage = await probeFirestoreAvailability(nextConfig);
+      if (firestoreProbeMessage) {
+        throw new Error(firestoreProbeMessage);
+      }
 
-      firestoreRef.current = db;
-      setAppData(normalizedSeededData);
-      setFirebaseConfig(nextConfig);
+      const connectWithMode = async (forceLongPolling = false) => {
+        const { db } = await initializeFirebaseClient(nextConfig, { forceLongPolling });
+        const seededData = await seedFirestoreCollections(db, appData);
+        const normalizedSeededData = normalizeAppData(seededData);
 
-      unsubscribeRef.current = subscribeToFirestore(db, (section, value) => {
-        setAppData((prev) =>
-          normalizeAppData({
+        firestoreRef.current = db;
+        setAppData(normalizedSeededData);
+        setFirebaseConfig(nextConfig);
+
+        unsubscribeRef.current = subscribeToFirestore(db, (section, value) => {
+          setAppData((prev) =>
+            normalizeAppData({
+              ...prev,
+              [section]: value,
+            }),
+          );
+
+          setFirebaseStatus((prev) => ({
             ...prev,
-            [section]: value,
-          }),
-        );
+            lastSync: createSyncTimestamp(),
+          }));
+        });
+      };
 
-        setFirebaseStatus((prev) => ({
-          ...prev,
-          lastSync: createSyncTimestamp(),
-        }));
-      });
+      try {
+        await connectWithMode(false);
+      } catch (error) {
+        if (!isFirestoreOfflineError(error)) {
+          throw error;
+        }
+
+        await connectWithMode(true);
+      }
 
       setFirebaseStatus({
         connected: true,
@@ -221,13 +241,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setFirebaseStatus({
         connected: false,
         connecting: false,
-        error: error instanceof Error ? error.message : 'Unable to connect to Firebase.',
+        error: getFirebaseConnectionErrorMessage(error, true),
         lastSync: null,
         projectId: null,
       });
 
       if (!silent) {
-        throw error;
+        throw new Error(getFirebaseConnectionErrorMessage(error, true));
       }
     }
   }

@@ -13,7 +13,11 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from '@/components/ui/sonner';
 import { Switch } from '@/components/ui/switch';
 import { useAppData } from '@/context/AppDataContext';
-import { createEmptyFirebaseConfig } from '@/lib/firebase';
+import {
+  createEmptyFirebaseConfig,
+  getFirestoreActivationUrl,
+  getFirestoreDatabaseSetupUrl,
+} from '@/lib/firebase';
 import {
   ROLE_LABELS,
   type DeveloperSettings,
@@ -48,6 +52,12 @@ const SettingsPage = () => {
   const [firebaseForm, setFirebaseForm] = useState<FirebaseConfig>(
     firebaseConfig.apiKey ? firebaseConfig : createEmptyFirebaseConfig(),
   );
+  const firestoreActivationUrl = firebaseForm.projectId
+    ? getFirestoreActivationUrl(firebaseForm.projectId)
+    : '';
+  const firestoreDatabaseSetupUrl = firebaseForm.projectId
+    ? getFirestoreDatabaseSetupUrl(firebaseForm.projectId)
+    : '';
 
   useEffect(() => {
     setProfileForm({
@@ -324,6 +334,26 @@ const SettingsPage = () => {
                 {firebaseStatus.connecting ? 'Connecting...' : firebaseStatus.connected ? 'Connected' : 'Disconnected'}
               </p>
               {firebaseStatus.error && <p className="mt-2 text-xs text-destructive">{firebaseStatus.error}</p>}
+              {firebaseStatus.error?.includes('Cloud Firestore API is disabled') && firestoreActivationUrl && (
+                <a
+                  href={firestoreActivationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex text-xs font-medium text-primary underline underline-offset-4"
+                >
+                  Open Firestore API setup
+                </a>
+              )}
+              {firebaseStatus.error?.includes('Firestore database is not created yet') && firestoreDatabaseSetupUrl && (
+                <a
+                  href={firestoreDatabaseSetupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex text-xs font-medium text-primary underline underline-offset-4"
+                >
+                  Create Firestore database
+                </a>
+              )}
             </div>
           </div>
 
@@ -338,6 +368,10 @@ const SettingsPage = () => {
             <button className="px-4 py-2 text-sm rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-muted transition-colors disabled:opacity-70" onClick={handlePushData} type="button" disabled={!firebaseStatus.connected}>
               <Database className="w-4 h-4 inline mr-2" />Push Data Now
             </button>
+          </div>
+
+          <div className="rounded-xl border border-dashed border-border bg-secondary/20 px-4 py-3 text-xs text-muted-foreground">
+            Make sure Firestore Database is created in the selected Firebase project. If normal transport is blocked on your network or hosting, the app now retries automatically with long-polling.
           </div>
         </section>
 

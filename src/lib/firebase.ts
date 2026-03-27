@@ -2,7 +2,7 @@
 import {
   doc,
   getDoc,
-  getFirestore,
+  initializeFirestore,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -37,6 +37,7 @@ const FIRESTORE_ROOT_COLLECTION = 'serviceflowHub';
 let activeApp: FirebaseApp | null = null;
 let activeDb: Firestore | null = null;
 let activeConfigKey = '';
+let activeTransportMode: 'auto' | 'long-polling' = 'auto';
 
 export function createEmptyFirebaseConfig(): FirebaseConfig {
   return {
@@ -59,11 +60,92 @@ export function getMissingFirebaseFields(config: FirebaseConfig) {
   return FIREBASE_REQUIRED_FIELDS.filter((field) => !config[field]?.trim());
 }
 
+export function getFirestoreActivationUrl(projectId: string) {
+  return `https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projectId.trim()}`;
+}
+
+export function getFirestoreDatabaseSetupUrl(projectId: string) {
+  return `https://console.cloud.google.com/datastore/setup?project=${projectId.trim()}`;
+}
+
+export function isFirestoreOfflineError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('client is offline') ||
+    message.includes('failed to get document because the client is offline') ||
+    message.includes('offline')
+  );
+}
+
+export function getFirebaseConnectionErrorMessage(error: unknown, retriedWithLongPolling = false) {
+  if (!(error instanceof Error)) {
+    return 'Unable to connect to Firebase.';
+  }
+
+  if (isFirestoreOfflineError(error)) {
+    return retriedWithLongPolling
+      ? 'Firestore is still unreachable after retrying with long-polling. Check your internet/firewall, and make sure a Firestore database has been created in this Firebase project.'
+      : 'Firestore could not reach the server. Retrying with long-polling...';
+  }
+
+  return error.message;
+}
+
+export async function probeFirestoreAvailability(config: FirebaseConfig) {
+  if (typeof fetch === 'undefined' || !config.projectId.trim() || !config.apiKey.trim()) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${config.projectId.trim()}/databases/(default)/documents/${FIRESTORE_ROOT_COLLECTION}/settings?key=${config.apiKey.trim()}`,
+    );
+
+    if (response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: { message?: string; details?: Array<{ reason?: string }> } }
+      | null;
+    const errorMessage = payload?.error?.message?.toLowerCase() ?? '';
+
+    const serviceDisabled =
+      payload?.error?.details?.some((detail) => detail.reason === 'SERVICE_DISABLED') ||
+      errorMessage.includes('cloud firestore api has not been used') ||
+      errorMessage.includes('service_disabled');
+
+    const databaseMissing =
+      response.status === 404 &&
+      (errorMessage.includes('database (default) does not exist') ||
+        errorMessage.includes('please visit https://console.cloud.google.com/datastore/setup'));
+
+    if (serviceDisabled) {
+      return `Cloud Firestore API is disabled for project ${config.projectId.trim()}. Enable it here: ${getFirestoreActivationUrl(config.projectId)} . Wait a minute, then retry.`;
+    }
+
+    if (databaseMissing) {
+      return `Firestore database is not created yet for project ${config.projectId.trim()}. Create it here: ${getFirestoreDatabaseSetupUrl(config.projectId)} . After the database is created, retry Firebase connect.`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getConfigKey(config: FirebaseConfig) {
   return FIREBASE_REQUIRED_FIELDS.map((field) => config[field]?.trim() ?? '').join('|');
 }
 
-export async function initializeFirebaseClient(config: FirebaseConfig) {
+export async function initializeFirebaseClient(
+  config: FirebaseConfig,
+  options?: { forceLongPolling?: boolean },
+) {
   if (!hasFirebaseCredentials(config)) {
     throw new Error(`Missing Firebase fields: ${getMissingFirebaseFields(config).join(', ')}`);
   }
@@ -80,8 +162,14 @@ export async function initializeFirebaseClient(config: FirebaseConfig) {
   };
 
   const nextConfigKey = getConfigKey(normalizedConfig);
+  const nextTransportMode = options?.forceLongPolling ? 'long-polling' : 'auto';
 
-  if (activeApp && activeDb && activeConfigKey === nextConfigKey) {
+  if (
+    activeApp &&
+    activeDb &&
+    activeConfigKey === nextConfigKey &&
+    activeTransportMode === nextTransportMode
+  ) {
     return { app: activeApp, db: activeDb };
   }
 
@@ -90,8 +178,12 @@ export async function initializeFirebaseClient(config: FirebaseConfig) {
   }
 
   activeApp = initializeApp(normalizedConfig, `serviceflow-hub-${normalizedConfig.projectId}`);
-  activeDb = getFirestore(activeApp);
+  activeDb = initializeFirestore(activeApp, {
+    experimentalAutoDetectLongPolling: nextTransportMode === 'auto',
+    experimentalForceLongPolling: nextTransportMode === 'long-polling',
+  });
   activeConfigKey = nextConfigKey;
+  activeTransportMode = nextTransportMode;
 
   return { app: activeApp, db: activeDb };
 }
@@ -104,6 +196,7 @@ export async function disconnectFirebaseClient() {
   activeApp = null;
   activeDb = null;
   activeConfigKey = '';
+  activeTransportMode = 'auto';
 }
 
 export async function seedFirestoreCollections(db: Firestore, data: AppDataState) {
