@@ -136,11 +136,11 @@ const SettingsPage = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Collections Ready</p>
-                <p className="text-lg font-semibold text-foreground">7 synced sections</p>
+                <p className="text-lg font-semibold text-foreground">8 synced sections</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Profile, team, projects, sales, services, notifications and settings are all backed by one shared store.
+              Profile, members, projects, sales, services, teams, notifications and settings are all backed by one shared store.
             </p>
           </div>
           <div className="glass rounded-xl p-5">

@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { defaultAppData } from '@/data/mock';
+import { demoAppData } from '@/data/mock';
 import {
   getProjectDisplayStatus,
   normalizeAppData,
+  upsertMemberAssignment,
   validateNewOrderId,
 } from '@/lib/workflow';
 
 describe('workflow utilities', () => {
   it('migrates legacy direct projects into linked sales records', () => {
     const migrated = normalizeAppData({
-      ...defaultAppData,
+      ...demoAppData,
       sales: [],
       projects: [
         {
@@ -44,13 +45,13 @@ describe('workflow utilities', () => {
   });
 
   it('blocks duplicate order ids', () => {
-    expect(validateNewOrderId('FO-29481', defaultAppData.sales)).toBe('Order ID already exists.');
-    expect(validateNewOrderId('FO-99999', defaultAppData.sales)).toBeNull();
+    expect(validateNewOrderId('FO-29481', demoAppData.sales)).toBe('Order ID already exists.');
+    expect(validateNewOrderId('FO-99999', demoAppData.sales)).toBeNull();
   });
 
   it('marks overdue projects as late unless already completed', () => {
     const lateProject = {
-      ...defaultAppData.projects[0],
+      ...demoAppData.projects[0],
       deadline: '2026-03-20',
       deliveryDeadline: '2026-03-20',
       status: 'in_progress' as const,
@@ -63,5 +64,25 @@ describe('workflow utilities', () => {
 
     expect(getProjectDisplayStatus(lateProject, new Date('2026-03-27T12:00:00Z'))).toBe('late');
     expect(getProjectDisplayStatus(completedProject, new Date('2026-03-27T12:00:00Z'))).toBe('completed');
+  });
+
+  it('moves a member to a new team without duplicate membership', () => {
+    const movedMembers = upsertMemberAssignment(
+      demoAppData.teamMembers,
+      {
+        id: '5',
+        serviceId: 'SV2',
+        teamId: 'T003',
+        role: 'team_member',
+        status: 'active',
+      },
+      demoAppData.services,
+      demoAppData.teams,
+    );
+
+    const movedMember = movedMembers.find((member) => member.id === '5');
+    expect(movedMember?.serviceId).toBe('SV2');
+    expect(movedMember?.teamId).toBe('T003');
+    expect(movedMember?.teamName).toBe('Shopify Team A');
   });
 });

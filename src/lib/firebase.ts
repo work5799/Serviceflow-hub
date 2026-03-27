@@ -25,6 +25,7 @@ export const APP_DATA_SECTIONS = [
   'projects',
   'sales',
   'services',
+  'teams',
   'notifications',
   'settings',
 ] as const;

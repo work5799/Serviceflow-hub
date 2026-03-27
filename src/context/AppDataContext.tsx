@@ -41,7 +41,7 @@ interface AppDataContextValue {
   pushCurrentDataToFirebase: () => Promise<void>;
 }
 
-const LOCAL_DATA_STORAGE_KEY = 'serviceflow-hub-app-data-v2';
+const LOCAL_DATA_STORAGE_KEY = 'serviceflow-hub-app-data-v3';
 const FIREBASE_CONFIG_STORAGE_KEY = 'serviceflow-hub-firebase-config-v2';
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined);
@@ -258,6 +258,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       'projects',
       'sales',
       'services',
+      'teams',
       'notifications',
       'settings',
     ];

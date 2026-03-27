@@ -445,6 +445,7 @@ const Operations = () => {
           onOpenChange={setDialogOpen}
           sale={selectedSale}
           services={appData.services}
+          teams={appData.teams}
           teamMembers={appData.teamMembers}
           existingProjectIds={appData.projects.map((project) => project.projectId)}
           onSubmit={handleMoveToOperations}
