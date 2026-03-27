@@ -1,4 +1,4 @@
-import { User, Project, Sale, Service, Notification } from '@/types';
+﻿import { AppDataState, Notification, Project, Sale, Service, User } from '@/types';
 
 export const currentUser: User = {
   id: '1',
@@ -6,6 +6,19 @@ export const currentUser: User = {
   email: 'alex@agency.com',
   role: 'developer',
 };
+
+export const teamMembers: User[] = [
+  currentUser,
+  { id: '2', name: 'Sarah K.', email: 'sarah@agency.com', role: 'project_manager' },
+  { id: '3', name: 'David L.', email: 'david@agency.com', role: 'project_manager' },
+  { id: '4', name: 'Lisa M.', email: 'lisa@agency.com', role: 'team_leader' },
+  { id: '5', name: 'John D.', email: 'john@agency.com', role: 'team_member' },
+  { id: '6', name: 'Emma S.', email: 'emma@agency.com', role: 'team_member' },
+  { id: '7', name: 'Tom W.', email: 'tom@agency.com', role: 'team_member' },
+  { id: '8', name: 'Mike R.', email: 'mike@agency.com', role: 'team_member' },
+  { id: '9', name: 'Anna B.', email: 'anna@agency.com', role: 'agm' },
+  { id: '10', name: 'Chris P.', email: 'chris@agency.com', role: 'team_member' },
+];
 
 export const mockProjects: Project[] = [
   { id: 'P001', name: 'E-Commerce Redesign', client: 'TechCorp', service: 'WordPress', teamLeader: 'Sarah K.', members: ['John D.', 'Mike R.'], startDate: '2026-02-01', deadline: '2026-04-15', status: 'ongoing', revenue: 4500 },
@@ -40,18 +53,40 @@ export const mockNotifications: Notification[] = [
   { id: 'N3', title: 'Project Completed', message: 'Custom Plugin Dev marked as completed.', type: 'success', read: true, date: '2026-03-24' },
 ];
 
-export const revenueChartData = [
-  { month: 'Oct', revenue: 12400 },
-  { month: 'Nov', revenue: 15800 },
-  { month: 'Dec', revenue: 14200 },
-  { month: 'Jan', revenue: 18500 },
-  { month: 'Feb', revenue: 21300 },
-  { month: 'Mar', revenue: 24800 },
-];
+export const defaultSettings: AppDataState['settings'] = {
+  organization: {
+    companyName: 'AgencyOS Studio',
+    supportEmail: 'support@agencyos.app',
+    currency: 'USD',
+    timezone: 'Asia/Dhaka',
+    locale: 'en-US',
+    fiscalYearStart: 'January',
+  },
+  developer: {
+    maintenanceMode: false,
+    allowUserInvites: true,
+    enableRealtimeSync: true,
+    enableAuditLog: true,
+    allowDataExport: true,
+    autoSeedCollections: true,
+    maxUploadSizeMb: 25,
+    rateLimitPerMinute: 120,
+    defaultNewUserRole: 'team_member',
+  },
+  notificationPreferences: {
+    emailReports: true,
+    pushAlerts: true,
+    deadlineWarnings: true,
+    salesDigest: true,
+  },
+};
 
-export const serviceChartData = [
-  { name: 'WordPress', value: 34500, fill: 'hsl(175 80% 45%)' },
-  { name: 'Shopify', value: 28200, fill: 'hsl(260 60% 60%)' },
-  { name: 'Design', value: 19800, fill: 'hsl(38 92% 55%)' },
-  { name: 'Marketing', value: 12400, fill: 'hsl(152 60% 42%)' },
-];
+export const defaultAppData: AppDataState = {
+  currentUser,
+  teamMembers,
+  projects: mockProjects,
+  sales: mockSales,
+  services: mockServices,
+  notifications: mockNotifications,
+  settings: defaultSettings,
+};

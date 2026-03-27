@@ -1,9 +1,10 @@
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { mockSales } from '@/data/mock';
+﻿import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { toast } from '@/components/ui/sonner';
+import { useAppData } from '@/context/AppDataContext';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { Search, Download } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const statusStyles = {
   completed: 'bg-success/10 text-success',
@@ -12,14 +13,34 @@ const statusStyles = {
 };
 
 const Sales = () => {
+  const { appData } = useAppData();
   const [search, setSearch] = useState('');
-  const filtered = mockSales.filter(s => s.orderId.toLowerCase().includes(search.toLowerCase()) || s.service.toLowerCase().includes(search.toLowerCase()));
-  const totalRevenue = mockSales.filter(s => s.status === 'completed').reduce((a, b) => a + b.amount, 0);
+  const filtered = appData.sales.filter(
+    (sale) =>
+      sale.orderId.toLowerCase().includes(search.toLowerCase()) ||
+      sale.service.toLowerCase().includes(search.toLowerCase()),
+  );
+  const completedSales = appData.sales.filter((sale) => sale.status === 'completed');
+  const totalRevenue = completedSales.reduce((sum, sale) => sum + sale.amount, 0);
+  const averageOrder = completedSales.length ? Math.round(totalRevenue / completedSales.length) : 0;
+
+  const exportSales = () => {
+    const headers = ['Order ID', 'Service', 'Date', 'Status', 'Amount'];
+    const rows = filtered.map((sale) => [sale.orderId, sale.service, sale.date, sale.status, sale.amount]);
+    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'serviceflow-sales.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Sales exported successfully.');
+  };
 
   return (
     <DashboardLayout title="Sales & Revenue">
       <div className="space-y-4">
-        {/* Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="glass rounded-xl p-5">
             <p className="text-sm text-muted-foreground">Total Revenue</p>
@@ -27,26 +48,33 @@ const Sales = () => {
           </div>
           <div className="glass rounded-xl p-5">
             <p className="text-sm text-muted-foreground">Total Orders</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{mockSales.length}</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{appData.sales.length}</p>
           </div>
           <div className="glass rounded-xl p-5">
             <p className="text-sm text-muted-foreground">Avg. Order</p>
-            <p className="text-2xl font-bold text-foreground mt-1">${Math.round(totalRevenue / mockSales.filter(s => s.status === 'completed').length).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-foreground mt-1">${averageOrder.toLocaleString()}</p>
           </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex gap-3 items-center justify-between">
-          <div className="relative w-72">
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search orders..." className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-secondary outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search orders..."
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-secondary outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
+            />
           </div>
-          <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-muted transition-colors">
-            <Download className="w-3.5 h-3.5" /> Export
+          <button
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-muted transition-colors"
+            onClick={exportSales}
+            type="button"
+          >
+            <Download className="w-3.5 h-3.5" /> Export CSV
           </button>
         </div>
 
-        {/* Table */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -60,13 +88,23 @@ const Sales = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s, i) => (
-                  <motion.tr key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="border-b border-border last:border-0 hover:bg-secondary/50 transition-colors">
-                    <td className="px-5 py-3.5 font-mono text-xs text-foreground">{s.orderId}</td>
-                    <td className="px-5 py-3.5 text-muted-foreground">{s.service}</td>
-                    <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">{s.date}</td>
-                    <td className="px-5 py-3.5"><span className={cn("text-xs px-2.5 py-1 rounded-full font-medium capitalize", statusStyles[s.status])}>{s.status}</span></td>
-                    <td className="px-5 py-3.5 text-right font-medium text-foreground">${s.amount.toLocaleString()}</td>
+                {filtered.map((sale, index) => (
+                  <motion.tr
+                    key={sale.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="border-b border-border last:border-0 hover:bg-secondary/50 transition-colors"
+                  >
+                    <td className="px-5 py-3.5 font-mono text-xs text-foreground">{sale.orderId}</td>
+                    <td className="px-5 py-3.5 text-muted-foreground">{sale.service}</td>
+                    <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">{sale.date}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={cn('text-xs px-2.5 py-1 rounded-full font-medium capitalize', statusStyles[sale.status])}>
+                        {sale.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-medium text-foreground">${sale.amount.toLocaleString()}</td>
                   </motion.tr>
                 ))}
               </tbody>

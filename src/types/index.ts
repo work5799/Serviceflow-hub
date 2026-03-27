@@ -1,4 +1,4 @@
-export type UserRole = 'developer' | 'agm' | 'project_manager' | 'team_leader' | 'team_member';
+﻿export type UserRole = 'developer' | 'agm' | 'project_manager' | 'team_leader' | 'team_member';
 
 export interface User {
   id: string;
@@ -47,6 +47,61 @@ export interface Notification {
   type: 'info' | 'success' | 'warning';
   read: boolean;
   date: string;
+}
+
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  measurementId?: string;
+  databaseURL?: string;
+}
+
+export interface OrganizationSettings {
+  companyName: string;
+  supportEmail: string;
+  currency: string;
+  timezone: string;
+  locale: string;
+  fiscalYearStart: string;
+}
+
+export interface DeveloperSettings {
+  maintenanceMode: boolean;
+  allowUserInvites: boolean;
+  enableRealtimeSync: boolean;
+  enableAuditLog: boolean;
+  allowDataExport: boolean;
+  autoSeedCollections: boolean;
+  maxUploadSizeMb: number;
+  rateLimitPerMinute: number;
+  defaultNewUserRole: UserRole;
+}
+
+export interface NotificationPreferences {
+  emailReports: boolean;
+  pushAlerts: boolean;
+  deadlineWarnings: boolean;
+  salesDigest: boolean;
+}
+
+export interface AppSettings {
+  organization: OrganizationSettings;
+  developer: DeveloperSettings;
+  notificationPreferences: NotificationPreferences;
+}
+
+export interface AppDataState {
+  currentUser: User;
+  teamMembers: User[];
+  projects: Project[];
+  sales: Sale[];
+  services: Service[];
+  notifications: Notification[];
+  settings: AppSettings;
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {

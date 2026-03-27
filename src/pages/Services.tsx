@@ -1,18 +1,20 @@
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { mockServices } from '@/data/mock';
+﻿import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { useAppData } from '@/context/AppDataContext';
 import { motion } from 'framer-motion';
-import { FolderKanban, Users, DollarSign } from 'lucide-react';
+import { DollarSign, FolderKanban, Users } from 'lucide-react';
 
 const Services = () => {
+  const { appData } = useAppData();
+
   return (
     <DashboardLayout title="Services">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {mockServices.map((service, i) => (
+        {appData.services.map((service, index) => (
           <motion.div
             key={service.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: index * 0.05 }}
             className="glass rounded-xl p-5 hover:scale-[1.02] transition-transform duration-200 cursor-pointer group"
           >
             <div className="flex items-center gap-3 mb-4">

@@ -1,4 +1,4 @@
-import { LucideIcon } from 'lucide-react';
+﻿import { LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -23,10 +23,12 @@ export function StatsCard({ title, value, change, changeType, icon: Icon, delay 
         <div>
           <p className="text-sm text-muted-foreground font-medium">{title}</p>
           <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
-          <p className={cn(
-            "text-xs font-medium mt-2",
-            changeType === 'up' ? 'text-success' : 'text-destructive'
-          )}>
+          <p
+            className={cn(
+              'text-xs font-medium mt-2',
+              changeType === 'up' ? 'text-success' : 'text-destructive',
+            )}
+          >
             {changeType === 'up' ? '↑' : '↓'} {change}
           </p>
         </div>
