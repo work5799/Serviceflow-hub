@@ -6,10 +6,10 @@ export function RevenueChart() {
   const { appData } = useAppData();
 
   const monthlyRevenue = appData.sales
-    .filter((sale) => sale.status === 'completed')
+    .filter((sale) => sale.status !== 'refunded')
     .reduce<Record<string, number>>((acc, sale) => {
-      const key = sale.date.slice(0, 7);
-      acc[key] = (acc[key] ?? 0) + sale.amount;
+      const key = sale.incomingDate.slice(0, 7);
+      acc[key] = (acc[key] ?? 0) + sale.revenueAmount;
       return acc;
     }, {});
 
@@ -27,7 +27,7 @@ export function RevenueChart() {
       transition={{ duration: 0.4, delay: 0.2 }}
       className="glass rounded-xl p-5"
     >
-      <h3 className="text-sm font-semibold text-foreground mb-4">Revenue Overview</h3>
+      <h3 className="text-sm font-semibold text-foreground mb-4">Sales Revenue Overview</h3>
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>

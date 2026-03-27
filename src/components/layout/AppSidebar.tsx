@@ -18,7 +18,7 @@ import { ROLE_COLORS, ROLE_LABELS } from '@/types';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { label: 'Projects', icon: FolderKanban, path: '/projects' },
+  { label: 'Operations', icon: FolderKanban, path: '/projects' },
   { label: 'Sales', icon: DollarSign, path: '/sales' },
   { label: 'Services', icon: Layers, path: '/services' },
   { label: 'Team', icon: Users, path: '/team' },

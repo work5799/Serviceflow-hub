@@ -1,4 +1,6 @@
-﻿export type UserRole = 'developer' | 'agm' | 'project_manager' | 'team_leader' | 'team_member';
+export type UserRole = 'developer' | 'agm' | 'project_manager' | 'team_leader' | 'team_member';
+export type ProjectStatus = 'pending' | 'in_progress' | 'completed' | 'late';
+export type SaleStatus = 'pending' | 'in_progress' | 'delivered' | 'late' | 'refunded';
 
 export interface User {
   id: string;
@@ -10,24 +12,44 @@ export interface User {
 
 export interface Project {
   id: string;
+  projectId: string;
+  orderId: string;
   name: string;
+  projectName: string;
   client: string;
+  clientName: string;
   service: string;
+  serviceType: string;
+  assignedService: string;
+  marketplace: string;
+  assignedTeam: string;
   teamLeader: string;
   members: string[];
   startDate: string;
   deadline: string;
-  status: 'pending' | 'ongoing' | 'completed';
+  deliveryDeadline: string;
+  status: ProjectStatus;
   revenue: number;
+  createdFromSaleId: string | null;
+  sourceModule: 'sales';
 }
 
 export interface Sale {
   id: string;
   orderId: string;
+  projectName: string;
+  clientName: string;
+  serviceType: string;
   service: string;
+  marketplace: string;
+  incomingDate: string;
   date: string;
+  deliveryDeadline: string;
+  revenueAmount: number;
   amount: number;
-  status: 'completed' | 'pending' | 'refunded';
+  status: SaleStatus;
+  projectId: string | null;
+  movedToOperationsAt: string | null;
 }
 
 export interface Service {

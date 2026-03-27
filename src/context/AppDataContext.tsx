@@ -18,6 +18,7 @@ import {
   seedFirestoreCollections,
   subscribeToFirestore,
 } from '@/lib/firebase';
+import { normalizeAppData } from '@/lib/workflow';
 import type { AppDataState, AppSettings, FirebaseConfig, User } from '@/types';
 
 interface FirebaseStatus {
@@ -59,10 +60,12 @@ function safeParse<T>(value: string | null, fallback: T) {
 
 function loadStoredAppData() {
   if (typeof window === 'undefined') {
-    return defaultAppData;
+    return normalizeAppData(defaultAppData);
   }
 
-  return safeParse<AppDataState>(window.localStorage.getItem(LOCAL_DATA_STORAGE_KEY), defaultAppData);
+  return normalizeAppData(
+    safeParse<AppDataState>(window.localStorage.getItem(LOCAL_DATA_STORAGE_KEY), defaultAppData),
+  );
 }
 
 function loadStoredFirebaseConfig() {
@@ -184,16 +187,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       const { db } = await initializeFirebaseClient(nextConfig);
       const seededData = await seedFirestoreCollections(db, appData);
+      const normalizedSeededData = normalizeAppData(seededData);
 
       firestoreRef.current = db;
-      setAppData(seededData);
+      setAppData(normalizedSeededData);
       setFirebaseConfig(nextConfig);
 
       unsubscribeRef.current = subscribeToFirestore(db, (section, value) => {
-        setAppData((prev) => ({
-          ...prev,
-          [section]: value,
-        }));
+        setAppData((prev) =>
+          normalizeAppData({
+            ...prev,
+            [section]: value,
+          }),
+        );
 
         setFirebaseStatus((prev) => ({
           ...prev,
