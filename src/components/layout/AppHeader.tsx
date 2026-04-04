@@ -4,7 +4,7 @@ import { useAppData } from '@/context/AppDataContext';
 
 export function AppHeader({ title }: { title: string }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { appData, firebaseStatus } = useAppData();
+  const { appData, supabaseStatus } = useAppData();
   const unreadCount = appData.notifications.filter((notification) => !notification.read).length;
   const isDark = (theme === 'system' ? resolvedTheme : theme) === 'dark';
 
@@ -13,8 +13,8 @@ export function AppHeader({ title }: { title: string }) {
       <div>
         <h1 className="text-xl font-bold text-foreground">{title}</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {firebaseStatus.connected
-            ? `Firebase connected${firebaseStatus.projectId ? `: ${firebaseStatus.projectId}` : ''}`
+          {supabaseStatus.connected
+            ? `Supabase connected${supabaseStatus.projectRef ? `: ${supabaseStatus.projectRef}` : ''}`
             : 'Using local cached data'}
         </p>
       </div>

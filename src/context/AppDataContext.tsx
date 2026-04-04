@@ -1,4 +1,4 @@
-﻿import {
+import {
   createContext,
   useContext,
   useEffect,
@@ -6,46 +6,45 @@
   useState,
   type ReactNode,
 } from 'react';
-import type { Firestore } from 'firebase/firestore';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { defaultAppData } from '@/data/mock';
 import {
   type AppDataSection,
-  createEmptyFirebaseConfig,
-  disconnectFirebaseClient,
-  getFirebaseConnectionErrorMessage,
-  hasFirebaseCredentials,
-  initializeFirebaseClient,
-  isFirestoreOfflineError,
-  probeFirestoreAvailability,
-  saveFirestoreSection,
-  seedFirestoreCollections,
-  subscribeToFirestore,
-} from '@/lib/firebase';
+  createEmptySupabaseConfig,
+  disconnectSupabaseClient,
+  getSupabaseConnectionErrorMessage,
+  getSupabaseProjectRef,
+  hasSupabaseCredentials,
+  initializeSupabaseClient,
+  saveSupabaseSection,
+  seedSupabaseSections,
+  subscribeToSupabase,
+} from '@/lib/supabase';
 import { normalizeAppData } from '@/lib/workflow';
-import type { AppDataState, AppSettings, FirebaseConfig, User } from '@/types';
+import type { AppDataState, AppSettings, SupabaseConfig, User } from '@/types';
 
-interface FirebaseStatus {
+interface SupabaseStatus {
   connected: boolean;
   connecting: boolean;
   error: string | null;
   lastSync: string | null;
-  projectId: string | null;
+  projectRef: string | null;
 }
 
 interface AppDataContextValue {
   appData: AppDataState;
-  firebaseConfig: FirebaseConfig;
-  firebaseStatus: FirebaseStatus;
+  supabaseConfig: SupabaseConfig;
+  supabaseStatus: SupabaseStatus;
   updateCurrentUser: (updates: Partial<User>) => Promise<void>;
   updateSettings: (updates: Partial<AppSettings>) => Promise<void>;
   replaceSection: <K extends AppDataSection>(section: K, value: AppDataState[K]) => Promise<void>;
-  connectFirebase: (config: FirebaseConfig) => Promise<void>;
-  disconnectFirebase: () => Promise<void>;
-  pushCurrentDataToFirebase: () => Promise<void>;
+  connectSupabase: (config: SupabaseConfig) => Promise<void>;
+  disconnectSupabase: () => Promise<void>;
+  pushCurrentDataToSupabase: () => Promise<void>;
 }
 
 const LOCAL_DATA_STORAGE_KEY = 'serviceflow-hub-app-data-v3';
-const FIREBASE_CONFIG_STORAGE_KEY = 'serviceflow-hub-firebase-config-v2';
+const SUPABASE_CONFIG_STORAGE_KEY = 'serviceflow-hub-supabase-config-v1';
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined);
 
@@ -71,14 +70,14 @@ function loadStoredAppData() {
   );
 }
 
-function loadStoredFirebaseConfig() {
+function loadStoredSupabaseConfig() {
   if (typeof window === 'undefined') {
-    return createEmptyFirebaseConfig();
+    return createEmptySupabaseConfig();
   }
 
-  return safeParse<FirebaseConfig>(
-    window.localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY),
-    createEmptyFirebaseConfig(),
+  return safeParse<SupabaseConfig>(
+    window.localStorage.getItem(SUPABASE_CONFIG_STORAGE_KEY),
+    createEmptySupabaseConfig(),
   );
 }
 
@@ -88,17 +87,17 @@ function createSyncTimestamp() {
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [appData, setAppData] = useState<AppDataState>(loadStoredAppData);
-  const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>(loadStoredFirebaseConfig);
-  const [firebaseStatus, setFirebaseStatus] = useState<FirebaseStatus>({
+  const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(loadStoredSupabaseConfig);
+  const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>({
     connected: false,
     connecting: false,
     error: null,
     lastSync: null,
-    projectId: null,
+    projectRef: null,
   });
 
-  const firestoreRef = useRef<Firestore | null>(null);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const supabaseRef = useRef<SupabaseClient | null>(null);
+  const unsubscribeRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -108,30 +107,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(firebaseConfig));
+      window.localStorage.setItem(SUPABASE_CONFIG_STORAGE_KEY, JSON.stringify(supabaseConfig));
     }
-  }, [firebaseConfig]);
+  }, [supabaseConfig]);
 
   useEffect(() => {
-    if (!hasFirebaseCredentials(firebaseConfig)) {
+    if (!hasSupabaseCredentials(supabaseConfig)) {
       return;
     }
 
-    void connectFirebase(firebaseConfig, true);
+    void connectSupabase(supabaseConfig, true);
 
     return () => {
-      unsubscribeRef.current?.();
+      void unsubscribeRef.current?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function writeRemoteSection<K extends AppDataSection>(section: K, value: AppDataState[K]) {
-    if (!firestoreRef.current) {
+    if (!supabaseRef.current) {
       return;
     }
 
-    await saveFirestoreSection(firestoreRef.current, section, value);
-    setFirebaseStatus((prev) => ({
+    await saveSupabaseSection(supabaseRef.current, supabaseConfig, section, value);
+    setSupabaseStatus((prev) => ({
       ...prev,
       error: null,
       lastSync: createSyncTimestamp(),
@@ -178,98 +177,81 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     await replaceSection('settings', nextSettings);
   }
 
-  async function connectFirebase(nextConfig: FirebaseConfig, silent = false) {
-    setFirebaseStatus((prev) => ({
+  async function connectSupabase(nextConfig: SupabaseConfig, silent = false) {
+    setSupabaseStatus((prev) => ({
       ...prev,
       connecting: true,
       error: null,
     }));
 
     try {
-      unsubscribeRef.current?.();
+      await unsubscribeRef.current?.();
 
-      const firestoreProbeMessage = await probeFirestoreAvailability(nextConfig);
-      if (firestoreProbeMessage) {
-        throw new Error(firestoreProbeMessage);
-      }
+      const { client, config } = await initializeSupabaseClient(nextConfig);
+      const seededData = await seedSupabaseSections(client, config, appData);
+      const normalizedSeededData = normalizeAppData(seededData);
 
-      const connectWithMode = async (forceLongPolling = false) => {
-        const { db } = await initializeFirebaseClient(nextConfig, { forceLongPolling });
-        const seededData = await seedFirestoreCollections(db, appData);
-        const normalizedSeededData = normalizeAppData(seededData);
+      supabaseRef.current = client;
+      setAppData(normalizedSeededData);
+      setSupabaseConfig(config);
 
-        firestoreRef.current = db;
-        setAppData(normalizedSeededData);
-        setFirebaseConfig(nextConfig);
-
-        unsubscribeRef.current = subscribeToFirestore(db, (section, value) => {
-          setAppData((prev) =>
-            normalizeAppData({
-              ...prev,
-              [section]: value,
-            }),
-          );
-
-          setFirebaseStatus((prev) => ({
+      unsubscribeRef.current = subscribeToSupabase(client, config, (section, value) => {
+        setAppData((prev) =>
+          normalizeAppData({
             ...prev,
-            lastSync: createSyncTimestamp(),
-          }));
-        });
-      };
+            [section]: value,
+          }),
+        );
 
-      try {
-        await connectWithMode(false);
-      } catch (error) {
-        if (!isFirestoreOfflineError(error)) {
-          throw error;
-        }
+        setSupabaseStatus((prev) => ({
+          ...prev,
+          lastSync: createSyncTimestamp(),
+        }));
+      });
 
-        await connectWithMode(true);
-      }
-
-      setFirebaseStatus({
+      setSupabaseStatus({
         connected: true,
         connecting: false,
         error: null,
         lastSync: createSyncTimestamp(),
-        projectId: nextConfig.projectId.trim(),
+        projectRef: getSupabaseProjectRef(config.url),
       });
     } catch (error) {
-      firestoreRef.current = null;
+      supabaseRef.current = null;
       unsubscribeRef.current = null;
 
-      setFirebaseStatus({
+      setSupabaseStatus({
         connected: false,
         connecting: false,
-        error: getFirebaseConnectionErrorMessage(error, true),
+        error: getSupabaseConnectionErrorMessage(error, nextConfig),
         lastSync: null,
-        projectId: null,
+        projectRef: null,
       });
 
       if (!silent) {
-        throw new Error(getFirebaseConnectionErrorMessage(error, true));
+        throw new Error(getSupabaseConnectionErrorMessage(error, nextConfig));
       }
     }
   }
 
-  async function disconnectFirebase() {
-    unsubscribeRef.current?.();
+  async function disconnectSupabase() {
+    await unsubscribeRef.current?.();
     unsubscribeRef.current = null;
-    firestoreRef.current = null;
-    await disconnectFirebaseClient();
+    supabaseRef.current = null;
+    await disconnectSupabaseClient();
 
-    setFirebaseStatus({
+    setSupabaseStatus({
       connected: false,
       connecting: false,
       error: null,
       lastSync: null,
-      projectId: null,
+      projectRef: null,
     });
   }
 
-  async function pushCurrentDataToFirebase() {
-    if (!firestoreRef.current) {
-      throw new Error('Firebase is not connected yet.');
+  async function pushCurrentDataToSupabase() {
+    if (!supabaseRef.current) {
+      throw new Error('Supabase is not connected yet.');
     }
 
     const sections: AppDataSection[] = [
@@ -284,10 +266,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     ];
 
     for (const section of sections) {
-      await saveFirestoreSection(firestoreRef.current, section, appData[section]);
+      await saveSupabaseSection(supabaseRef.current, supabaseConfig, section, appData[section]);
     }
 
-    setFirebaseStatus((prev) => ({
+    setSupabaseStatus((prev) => ({
       ...prev,
       error: null,
       lastSync: createSyncTimestamp(),
@@ -298,14 +280,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     <AppDataContext.Provider
       value={{
         appData,
-        firebaseConfig,
-        firebaseStatus,
+        supabaseConfig,
+        supabaseStatus,
         updateCurrentUser,
         updateSettings,
         replaceSection,
-        connectFirebase,
-        disconnectFirebase,
-        pushCurrentDataToFirebase,
+        connectSupabase,
+        disconnectSupabase,
+        pushCurrentDataToSupabase,
       }}
     >
       {children}

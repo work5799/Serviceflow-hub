@@ -24,7 +24,7 @@ const statusStyles = {
 } as const;
 
 const Operations = () => {
-  const { appData, replaceSection, firebaseStatus } = useAppData();
+  const { appData, replaceSection, supabaseStatus } = useAppData();
   const now = useNow(1000);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | Project['status']>('all');
@@ -196,7 +196,7 @@ const Operations = () => {
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                {firebaseStatus.connected ? 'Firestore synced' : 'Local cache'}
+                {supabaseStatus.connected ? 'Supabase synced' : 'Local cache'}
               </span>
             </div>
 

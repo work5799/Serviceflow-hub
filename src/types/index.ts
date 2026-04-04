@@ -109,15 +109,11 @@ export interface Notification {
   date: string;
 }
 
-export interface FirebaseConfig {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
-  measurementId?: string;
-  databaseURL?: string;
+export interface SupabaseConfig {
+  url: string;
+  anonKey: string;
+  tableName: string;
+  schema: string;
 }
 
 export interface OrganizationSettings {

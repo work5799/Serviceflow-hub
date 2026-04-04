@@ -433,7 +433,7 @@ const Team = () => {
 
           {!isMemberFormAgm && !hasActiveServices && (
             <div className="mb-4 rounded-xl border border-dashed border-border bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
-              No services found in Firebase yet. Create a service first, then member assignment will become available here instantly.
+              No services found in Supabase yet. Create a service first, then member assignment will become available here instantly.
             </div>
           )}
 
